@@ -2185,29 +2185,15 @@ void SpdySession::EnqueueResetStreamFrame(spdy::SpdyStreamId stream_id,
 
   DCHECK(buffered_spdy_framer_.get());
   int padding_len = base::RandInt(48, 72) - spdy::kDataFrameMinimumSize;
+  padding_len = std::min(padding_len, session_send_window_size_);
+
   std::unique_ptr<spdy::SpdySerializedFrame> rst_frame(
       buffered_spdy_framer_->CreateRstStream(stream_id, error_code,
                                              padding_len));
 
-  auto buffer = std::make_unique<SpdyBuffer>(std::move(rst_frame));
-
   DecreaseSendWindowSize(padding_len);
-  buffer->AddConsumeCallback(base::BindRepeating(
-      &SpdySession::OnWriteBufferConsumed, weak_factory_.GetWeakPtr(),
-      static_cast<size_t>(padding_len)));
-
-  auto it = active_streams_.find(stream_id);
-  if (it != active_streams_.end()) {
-    it->second->DecreaseSendWindowSize(padding_len);
-    buffer->AddConsumeCallback(base::BindRepeating(
-        &SpdyStream::OnWriteBufferConsumed, it->second->GetWeakPtr(),
-        static_cast<size_t>(padding_len)));
-  }
-
-  EnqueueWrite(priority, spdy::SpdyFrameType::RST_STREAM,
-               std::make_unique<SimpleBufferProducer>(std::move(buffer)),
-               base::WeakPtr<SpdyStream>(),
-               kSpdySessionCommandsTrafficAnnotation);
+  EnqueueSessionWrite(priority, spdy::SpdyFrameType::RST_STREAM,
+                      std::move(rst_frame));
   RecordProtocolErrorHistogram(MapRstStreamStatusToProtocolError(error_code));
 }
 
@@ -2715,39 +2701,12 @@ void SpdySession::SendWindowUpdateFrame(spdy::SpdyStreamId stream_id,
   });
 
   DCHECK(buffered_spdy_framer_.get());
-  if (stream_id == spdy::kSessionFlowControlStreamId) {
-    std::unique_ptr<spdy::SpdySerializedFrame> window_update_frame(
-        buffered_spdy_framer_->CreateWindowUpdate(stream_id,
-                                                  delta_window_size));
+  std::unique_ptr<spdy::SpdySerializedFrame> window_update_frame(
+      buffered_spdy_framer_->CreateWindowUpdate(stream_id,
+                                                delta_window_size));
 
-    EnqueueSessionWrite(priority, spdy::SpdyFrameType::WINDOW_UPDATE,
-                        std::move(window_update_frame));
-  } else {
-    int padding_len = base::RandInt(48, 72) - spdy::kDataFrameMinimumSize;
-    std::unique_ptr<spdy::SpdySerializedFrame> window_update_frame(
-        buffered_spdy_framer_->CreateWindowUpdate(stream_id, delta_window_size,
-                                                  padding_len));
-
-    auto buffer = std::make_unique<SpdyBuffer>(std::move(window_update_frame));
-
-    DecreaseSendWindowSize(padding_len);
-    buffer->AddConsumeCallback(base::BindRepeating(
-        &SpdySession::OnWriteBufferConsumed, weak_factory_.GetWeakPtr(),
-        static_cast<size_t>(padding_len)));
-
-    auto it = active_streams_.find(stream_id);
-    if (it != active_streams_.end()) {
-      it->second->DecreaseSendWindowSize(padding_len);
-      buffer->AddConsumeCallback(base::BindRepeating(
-          &SpdyStream::OnWriteBufferConsumed, it->second->GetWeakPtr(),
-          static_cast<size_t>(padding_len)));
-    }
-
-    EnqueueWrite(priority, spdy::SpdyFrameType::WINDOW_UPDATE,
-                 std::make_unique<SimpleBufferProducer>(std::move(buffer)),
-                 base::WeakPtr<SpdyStream>(),
-                 kSpdySessionCommandsTrafficAnnotation);
-  }
+  EnqueueSessionWrite(priority, spdy::SpdyFrameType::WINDOW_UPDATE,
+                      std::move(window_update_frame));
 }
 
 void SpdySession::WritePingFrame(spdy::SpdyPingId unique_id, bool is_ack) {

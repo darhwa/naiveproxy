@@ -304,26 +304,10 @@ std::unique_ptr<spdy::SpdySerializedFrame> BufferedSpdyFramer::CreatePingFrame(
 // spdy::SpdyWindowUpdateIR).
 std::unique_ptr<spdy::SpdySerializedFrame>
 BufferedSpdyFramer::CreateWindowUpdate(spdy::SpdyStreamId stream_id,
-                                       uint32_t delta_window_size,
-                                       uint32_t padding_len) const {
+                                       uint32_t delta_window_size) const {
   spdy::SpdyWindowUpdateIR update_ir(stream_id, delta_window_size);
-  if (padding_len == 0) {
-    return std::make_unique<spdy::SpdySerializedFrame>(
-        spdy_framer_.SerializeWindowUpdate(update_ir));
-  } else {
-    spdy::SpdyDataIR data_ir(stream_id, nullptr);
-    data_ir.set_padding_len(padding_len);
-
-    size_t frame_size = data_ir.size() + update_ir.size();
-    auto frame_data = std::make_unique<char[]>(frame_size);
-    spdy::ArrayOutputBuffer output(frame_data.get(), frame_size);
-
-    spdy_framer_.SerializeData(data_ir, &output);
-    spdy_framer_.SerializeWindowUpdate(update_ir, &output);
-
-    return std::make_unique<spdy::SpdySerializedFrame>(
-        frame_data.release(), frame_size, /* owns_buffer = */ true);
-  }
+  return std::make_unique<spdy::SpdySerializedFrame>(
+      spdy_framer_.SerializeWindowUpdate(update_ir));
 }
 
 // TODO(jgraettinger): Eliminate uses of this method (prefer spdy::SpdyDataIR).

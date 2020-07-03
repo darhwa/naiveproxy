@@ -192,7 +192,7 @@ std::unique_ptr<spdy::SpdySerializedFrame> SpdyStream::ProduceHeadersFrame() {
   auto it = request_headers_.find(":method");
   if (it != request_headers_.end() && it->second == "CONNECT") {
     enable_padding_ = true;
-    padding_len = base::RandInt(32, 48);
+    padding_len = base::RandInt(32, 64);
   } else {
     enable_padding_ = false;
   }
@@ -861,7 +861,7 @@ void SpdyStream::QueueNextDataFrame() {
   spdy::SpdyDataFlags flags = (pending_send_status_ == NO_MORE_DATA_TO_SEND)
                                   ? spdy::DATA_FLAG_FIN
                                   : spdy::DATA_FLAG_NONE;
-  if (++sent_data_frames_ <= 4 && enable_padding_) {
+  if (++sent_data_frames_ <= 8 && enable_padding_) {
     CHECK_EQ(data_padding_len_, 0) << stream_id_;
     data_padding_len_ = base::RandInt(1, spdy::kPaddingSizePerFrame);
   }

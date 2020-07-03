@@ -214,8 +214,7 @@ class NET_EXPORT_PRIVATE BufferedSpdyFramer
       bool is_ack) const;
   std::unique_ptr<spdy::SpdySerializedFrame> CreateWindowUpdate(
       spdy::SpdyStreamId stream_id,
-      uint32_t delta_window_size,
-      uint32_t padding_len = 0) const;
+      uint32_t delta_window_size) const;
   std::unique_ptr<spdy::SpdySerializedFrame> CreateDataFrame(
       spdy::SpdyStreamId stream_id,
       const char* data,
