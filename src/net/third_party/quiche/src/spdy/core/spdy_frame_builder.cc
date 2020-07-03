@@ -160,6 +160,33 @@ bool SpdyFrameBuilder::WriteBytes(const void* data, uint32_t data_len) {
   return true;
 }
 
+bool SpdyFrameBuilder::WriteEmptyBytes(uint32_t data_len) {
+  if (!CanWrite(data_len)) {
+    return false;
+  }
+
+  if (output_ == nullptr) {
+    char* dest = GetWritableBuffer(data_len);
+    memset(dest, 0, data_len);
+    Seek(data_len);
+  } else {
+    char* dest = nullptr;
+    size_t size = 0;
+    while (data_len > 0) {
+      dest = GetWritableOutput(data_len, &size);
+      if (dest == nullptr || size == 0) {
+        // Unable to make progress.
+        return false;
+      }
+      uint32_t to_copy = std::min<uint32_t>(data_len, size);
+      memset(dest, 0, to_copy);
+      Seek(to_copy);
+      data_len -= to_copy;
+    }
+  }
+  return true;
+}
+
 bool SpdyFrameBuilder::CanWrite(size_t length) const {
   if (length > kLengthMask) {
     DCHECK(false);
